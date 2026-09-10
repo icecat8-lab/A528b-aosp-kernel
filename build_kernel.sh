@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 export ARCH=arm64
 export SUBARCH=arm64
