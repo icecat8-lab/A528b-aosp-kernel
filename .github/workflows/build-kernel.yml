@@ -1,9 +1,9 @@
 name: Build Kernel (clang-19 / r530567)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:      # กดรันเองจากแท็บ Actions ได้
   push:
-    branches: [ main ]
+    branches: [ main ]     # หรือแก้เป็น branch ที่ใช้จริง
 
 jobs:
   build:
@@ -47,9 +47,14 @@ jobs:
         run: |
           ${{ steps.find-clang.outputs.clang_dir }}/bin/clang --version
 
-      - name: Build kernel
+      - name: Restore script permissions
         run: |
           chmod +x build_kernel.sh
+          find scripts -type f \( -name "*.py" -o -name "*.sh" -o -name "*.pl" \) -exec chmod +x {} \;
+          find tools -type f -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+
+      - name: Build kernel
+        run: |
           export PATH=${{ steps.find-clang.outputs.clang_dir }}/bin:$PATH
           ./build_kernel.sh
 
@@ -58,7 +63,7 @@ jobs:
           mkdir -p out_modules
           find out -name "*.ko" -exec cp {} out_modules/ \;
           ls -la out_modules/
-        
+
       - name: Upload Image + dtb
         uses: actions/upload-artifact@v4
         with:
