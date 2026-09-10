@@ -1,9 +1,9 @@
 name: Build Kernel (clang-19 / r530567)
 
 on:
-  workflow_dispatch:      
+  workflow_dispatch:
   push:
-    branches: [ main ]   
+    branches: [ main ]
 
 jobs:
   build:
@@ -36,13 +36,21 @@ jobs:
           git clone https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 \
             -b llvm-r530567 --depth 1 toolchain/clang-19
 
+      - name: Locate clang binary
+        id: find-clang
+        run: |
+          CLANG_BIN=$(find toolchain/clang-19 -maxdepth 2 -type d -name "bin" | head -n1)
+          echo "Found: $CLANG_BIN"
+          echo "clang_dir=$(dirname $CLANG_BIN)" >> "$GITHUB_OUTPUT"
+
       - name: Verify clang version
         run: |
-          toolchain/clang-19/bin/clang --version
+          ${{ steps.find-clang.outputs.clang_dir }}/bin/clang --version
 
       - name: Build kernel
         run: |
           chmod +x build_kernel.sh
+          export PATH=${{ steps.find-clang.outputs.clang_dir }}/bin:$PATH
           ./build_kernel.sh
 
       - name: Collect built modules
@@ -52,24 +60,4 @@ jobs:
           ls -la out_modules/
 
       - name: Upload Image + dtb
-        uses: actions/upload-artifact@v4
-        with:
-          name: kernel-image
-          path: |
-            arch/arm64/boot/Image
-            out/arch/arm64/boot/dts/**/*.dtb
-          if-no-files-found: warn
-
-      - name: Upload kernel modules (.ko)
-        uses: actions/upload-artifact@v4
-        with:
-          name: kernel-modules
-          path: out_modules/*.ko
-          if-no-files-found: warn
-
-      - name: Upload full build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: out/.config
+        uses: actions/upload-artifac
