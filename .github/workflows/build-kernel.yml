@@ -33,10 +33,10 @@ jobs:
         if: steps.cache-clang.outputs.cache-hit != 'true'
         run: |
           mkdir -p toolchain/clang-r530567
-          # ดาวน์โหลดตรงแบบบีบอัดไฟล์จากต้นทาง AOSP เร็วกว่าการทำ git clone
           wget https://googlesource.com
           tar -C toolchain/clang-r530567 -xf clang-r530567.tar.gz
           rm clang-r530567.tar.gz
+
 
       - name: Set permissions and verify clang version
         run: |
