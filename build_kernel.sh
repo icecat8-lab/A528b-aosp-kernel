@@ -5,11 +5,18 @@ export ARCH=arm64
 export SUBARCH=arm64
 mkdir -p out
 
-CLANG_DIR=$(find "$(pwd)/toolchain/clang-19" -maxdepth 3 -type f -path "*/bin/clang" | head -n1 | xargs dirname | xargs dirname)
+CLANG_BIN=$(find "$(pwd)/toolchain" -maxdepth 4 -type f -path "*/bin/clang" | head -n1)
+
+if [ -z "$CLANG_BIN" ]; then
+    echo "Error: Clang binary not found in toolchain directory!"
+    exit 1
+fi
+
+CLANG_DIR=$(dirname "$(dirname "$CLANG_BIN")")
 export PATH=$CLANG_DIR/bin:$PATH
 
 echo "Using clang from: $CLANG_DIR"
- $CLANG_DIR/bin/clang --version
+$CLANG_DIR/bin/clang --version
 
 make -C "$(pwd)" O="$(pwd)/out" ARCH=arm64 vendor/a52sxq_eur_open_defconfig
 
