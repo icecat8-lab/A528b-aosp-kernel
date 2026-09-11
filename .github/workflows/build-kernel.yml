@@ -33,7 +33,12 @@ jobs:
         if: steps.cache-clang.outputs.cache-hit != 'true'
         run: |
           mkdir -p toolchain/android-clang
-          git clone --depth=1 https://googlesource.com toolchain/android-clang
+          cd toolchain/android-clang
+          git init
+          git remote add origin https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86
+          git config core.sparseCheckout true
+          echo "clang-r530567/*" >> .git/info/sparse-checkout
+          git pull --depth=1 origin main
 
       - name: Locate and verify clang compiler
         id: find-clang
