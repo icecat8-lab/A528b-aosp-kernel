@@ -1,4 +1,4 @@
-name: Build Kernel (clang-19)
+name: Build Kernel (clang-r530567)
 
 on:
   workflow_dispatch:
@@ -20,38 +20,29 @@ jobs:
           sudo apt-get install -y \
             bc bison flex libssl-dev libelf-dev \
             build-essential python3 python3-pip \
-            git-lfs curl device-tree-compiler
+            git-lfs curl device-tree-compiler wget tar
 
       - name: Cache clang toolchain
         id: cache-clang
         uses: actions/cache@v4
         with:
-          path: toolchain/clang-19
-          key: clang-r547379-linux-x86
+          path: toolchain/clang-r530567
+          key: clang-r530567-linux-x86
 
-      - name: Download clang 19 (r547379) toolchain
+      - name: Download clang r530567 toolchain
         if: steps.cache-clang.outputs.cache-hit != 'true'
         run: |
-          mkdir -p toolchain
-          git clone https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 \
-            -b llvm-r547379 --depth 1 toolchain/clang-19
+          mkdir -p toolchain/clang-r530567
+          # ดาวน์โหลดตรงแบบบีบอัดไฟล์จากต้นทาง AOSP เร็วกว่าการทำ git clone
+          wget https://googlesource.com
+          tar -C toolchain/clang-r530567 -xf clang-r530567.tar.gz
+          rm clang-r530567.tar.gz
 
-      - name: Locate clang binary
-        id: find-clang
+      - name: Set permissions and verify clang version
         run: |
-          CLANG_BIN=$(find toolchain/clang-19 -maxdepth 3 -type f -path "*/bin/clang" | head -n1)
-          if [ -z "$CLANG_BIN" ]; then
-            echo "::error::clang binary not found in toolchain/clang-19"
-            find toolchain/clang-19 -maxdepth 2 -type d | head -20
-            exit 1
-          fi
-          CLANG_DIR=$(dirname "$(dirname "$CLANG_BIN")")
-          echo "Found clang dir: $CLANG_DIR"
-          echo "clang_dir=$CLANG_DIR" >> "$GITHUB_OUTPUT"
-
-      - name: Verify clang version
-        run: |
-          ${{ steps.find-clang.outputs.clang_dir }}/bin/clang --version
+          # บังคับสิทธิ์ให้ไฟล์ใน bin สามารถ Run ได้ (ป้องกันปัญหา Permission Denied บน GitHub Actions)
+          chmod +x toolchain/clang-r530567/bin/*
+          toolchain/clang-r530567/bin/clang --version
 
       - name: Restore script permissions
         run: |
@@ -62,9 +53,9 @@ jobs:
       - name: Patch defconfig (cleanup)
         run: |
           DEFCONFIG=arch/arm64/configs/vendor/a52sxq_eur_open_defconfig
-          # CONFIG_CLANG_VERSION คำนวณตอน build เสมอ ห้าม hardcode ใน defconfig
+          # ลบ CONFIG_CLANG_VERSION ออกเพื่อให้ระบบคำนวณใหม่ตาม Clang ตัวที่ใช้จริง
           sed -i '/CONFIG_CLANG_VERSION/d' "$DEFCONFIG"
-          # ปิด platform อื่น กันไม่ให้ build DTB ของ allwinner/sunxi
+          # ปิดการทำงานแพลตฟอร์มอื่นที่ไม่เกี่ยวข้องออกเพื่อความรวดเร็ว
           sed -i \
             -e 's/^CONFIG_ARCH_SUNXI=y/# CONFIG_ARCH_SUNXI is not set/' \
             -e 's/^CONFIG_ARCH_ALLWINNER=y/# CONFIG_ARCH_ALLWINNER is not set/' \
@@ -76,7 +67,8 @@ jobs:
 
       - name: Build kernel
         run: |
-          export PATH=${{ steps.find-clang.outputs.clang_dir }}/bin:$PATH
+          # ส่ง PATH ของคอมไพเลอร์ที่โหลดมาเข้าไปในตัวแปรระบบหลักก่อนรันสคริปต์
+          export PATH=$GITHUB_WORKSPACE/toolchain/clang-r530567/bin:$PATH
           ./build_kernel.sh
 
       - name: Collect built modules
