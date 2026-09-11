@@ -27,26 +27,27 @@ jobs:
         uses: actions/cache@v4
         with:
           path: toolchain/clang-19
-          key: clang-r530567-linux-x86
+          key: clang-r547379-linux-x86
 
-      - name: Download clang 19 (r530567) toolchain
+      - name: Download clang 19 (r547379) toolchain
         if: steps.cache-clang.outputs.cache-hit != 'true'
         run: |
           mkdir -p toolchain
           git clone https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 \
-            -b llvm-r530567 --depth 1 toolchain/clang-19
+            -b llvm-r547379 --depth 1 toolchain/clang-19
 
       - name: Locate clang binary
         id: find-clang
         run: |
-          CLANG_BIN=$(find toolchain/clang-19 -maxdepth 2 -type d -name "bin" -path "*r530567*" | head -n1)
+          CLANG_BIN=$(find toolchain/clang-19 -maxdepth 3 -type f -path "*/bin/clang" | head -n1)
           if [ -z "$CLANG_BIN" ]; then
-            echo "::error::clang-r530567 directory not found in toolchain/clang-19"
-            find toolchain/clang-19 -maxdepth 1 -type d
+            echo "::error::clang binary not found in toolchain/clang-19"
+            find toolchain/clang-19 -maxdepth 2 -type d | head -20
             exit 1
           fi
-          echo "Found: $CLANG_BIN"
-          echo "clang_dir=$(dirname $CLANG_BIN)" >> "$GITHUB_OUTPUT"
+          CLANG_DIR=$(dirname "$(dirname "$CLANG_BIN")")
+          echo "Found clang dir: $CLANG_DIR"
+          echo "clang_dir=$CLANG_DIR" >> "$GITHUB_OUTPUT"
 
       - name: Verify clang version
         run: |
@@ -57,6 +58,21 @@ jobs:
           chmod +x build_kernel.sh
           find scripts -type f \( -name "*.py" -o -name "*.sh" -o -name "*.pl" \) -exec chmod +x {} \;
           find tools -type f -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+
+      - name: Patch defconfig (cleanup)
+        run: |
+          DEFCONFIG=arch/arm64/configs/vendor/a52sxq_eur_open_defconfig
+          # CONFIG_CLANG_VERSION คำนวณตอน build เสมอ ห้าม hardcode ใน defconfig
+          sed -i '/CONFIG_CLANG_VERSION/d' "$DEFCONFIG"
+          # ปิด platform อื่น กันไม่ให้ build DTB ของ allwinner/sunxi
+          sed -i \
+            -e 's/^CONFIG_ARCH_SUNXI=y/# CONFIG_ARCH_SUNXI is not set/' \
+            -e 's/^CONFIG_ARCH_ALLWINNER=y/# CONFIG_ARCH_ALLWINNER is not set/' \
+            -e 's/^CONFIG_OF_ALL_DTBS=y/# CONFIG_OF_ALL_DTBS is not set/' \
+            -e 's/^CONFIG_COMPILE_TEST=y/# CONFIG_COMPILE_TEST is not set/' \
+            "$DEFCONFIG"
+          echo "--- symbols after patch ---"
+          grep -nE "ARCH_SUNXI|ARCH_ALLWINNER|OF_ALL_DTBS|COMPILE_TEST|CLANG_VERSION" "$DEFCONFIG" || true
 
       - name: Build kernel
         run: |
@@ -69,13 +85,14 @@ jobs:
           find out -name "*.ko" -exec cp {} out_modules/ \;
           ls -la out_modules/
 
-      - name: Upload Image + dtb
+      - name: Upload Image + dtb/dtbo
         uses: actions/upload-artifact@v4
         with:
           name: kernel-image
           path: |
             arch/arm64/boot/Image
             out/arch/arm64/boot/dts/**/*.dtb
+            out/arch/arm64/boot/dts/**/*.dtbo
           if-no-files-found: warn
 
       - name: Upload kernel modules (.ko)
@@ -85,9 +102,9 @@ jobs:
           path: out_modules/*.ko
           if-no-files-found: warn
 
-      - name: Upload full build log
+      - name: Upload build config
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build-log
+          name: build-config
           path: out/.config
