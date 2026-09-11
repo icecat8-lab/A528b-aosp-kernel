@@ -1,4 +1,4 @@
-name: Build Kernel (clang-19)
+name: Build Kernel (clang-r530567)
 
 on:
   workflow_dispatch:
@@ -33,9 +33,7 @@ jobs:
         if: steps.cache-clang.outputs.cache-hit != 'true'
         run: |
           mkdir -p toolchain/android-clang
-          wget https://googlesource.com
-          tar -C toolchain/android-clang -xf clang-r530567.tar.gz
-          rm clang-r530567.tar.gz
+          git clone --depth=1 https://googlesource.com toolchain/android-clang
 
       - name: Locate and verify clang compiler
         id: find-clang
