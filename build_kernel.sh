@@ -5,7 +5,7 @@ export ARCH=arm64
 export SUBARCH=arm64
 mkdir -p out
 
-CLANG_DIR=$(find $(pwd)/toolchain/clang-19 -maxdepth 2 -type d -name "bin" -path "*r530567*" | head -n1 | xargs dirname)
+CLANG_DIR=$(find $(pwd)/toolchain/clang-19 -maxdepth 2 -type d -name "bin" -path "*r547379*" | head -n1 | xargs dirname)
 export PATH=$CLANG_DIR/bin:$PATH
 
 echo "Using clang from: $CLANG_DIR"
