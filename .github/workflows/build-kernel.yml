@@ -20,7 +20,7 @@ jobs:
           sudo apt-get install -y \
             bc bison flex libssl-dev libelf-dev \
             build-essential python3 python3-pip \
-            git-lfs curl device-tree-compiler wget tar
+            git-lfs curl device-tree-compiler wget tar git
 
       - name: Cache clang toolchain
         id: cache-clang
@@ -32,9 +32,10 @@ jobs:
       - name: Download clang r530567 toolchain
         if: steps.cache-clang.outputs.cache-hit != 'true'
         run: |
-          mkdir -p toolchain
-          git clone https://googlesource.com \
-            -b main --depth 1 toolchain/android-clang
+          mkdir -p toolchain/android-clang
+          wget https://googlesource.com
+          tar -C toolchain/android-clang -xf clang-r530567.tar.gz
+          rm clang-r530567.tar.gz
 
       - name: Locate and verify clang compiler
         id: find-clang
