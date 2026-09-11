@@ -1,4 +1,4 @@
-name: Build Kernel (clang-r530567)
+name: Build Kernel (clang-19 / r530567)
 
 on:
   workflow_dispatch:
@@ -20,57 +20,43 @@ jobs:
           sudo apt-get install -y \
             bc bison flex libssl-dev libelf-dev \
             build-essential python3 python3-pip \
-            git-lfs curl device-tree-compiler wget tar git
+            git-lfs curl device-tree-compiler
 
       - name: Cache clang toolchain
         id: cache-clang
         uses: actions/cache@v4
         with:
-          path: toolchain/android-clang
+          path: toolchain/clang-19
           key: clang-r530567-linux-x86
 
-      - name: Download clang r530567 toolchain
+      - name: Download clang 19 (r530567) toolchain
         if: steps.cache-clang.outputs.cache-hit != 'true'
         run: |
-          mkdir -p toolchain/android-clang
-          cd toolchain/android-clang
-          git init
-          git remote add origin https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86
-          git config core.sparseCheckout true
-          echo "clang-r530567/*" >> .git/info/sparse-checkout
-          git pull --depth=1 origin main
+          mkdir -p toolchain
+          git clone https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 \
+            -b llvm-r530567 --depth 1 toolchain/clang-19
 
-      - name: Locate and verify clang compiler
+      - name: Locate clang binary
         id: find-clang
         run: |
-          CLANG_BIN=$(find toolchain/android-clang -maxdepth 4 -type f -path "*/bin/clang" | head -n1)
+          CLANG_BIN=$(find toolchain/clang-19 -maxdepth 2 -type d -name "bin" -path "*r530567*" | head -n1)
           if [ -z "$CLANG_BIN" ]; then
-            echo "::error::Clang binary not found in toolchain directory!"
+            echo "::error::clang-r530567 directory not found in toolchain/clang-19"
+            find toolchain/clang-19 -maxdepth 1 -type d
             exit 1
           fi
-          CLANG_DIR=$(dirname "$(dirname "$CLANG_BIN")")
-          chmod +x $CLANG_DIR/bin/*
-          $CLANG_DIR/bin/clang --version
-          echo "clang_dir=$CLANG_DIR" >> "$GITHUB_OUTPUT"
+          echo "Found: $CLANG_BIN"
+          echo "clang_dir=$(dirname $CLANG_BIN)" >> "$GITHUB_OUTPUT"
+
+      - name: Verify clang version
+        run: |
+          ${{ steps.find-clang.outputs.clang_dir }}/bin/clang --version
 
       - name: Restore script permissions
         run: |
           chmod +x build_kernel.sh
           find scripts -type f \( -name "*.py" -o -name "*.sh" -o -name "*.pl" \) -exec chmod +x {} \;
           find tools -type f -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
-
-      - name: Patch defconfig (cleanup)
-        run: |
-          DEFCONFIG=arch/arm64/configs/vendor/a52sxq_eur_open_defconfig
-          sed -i '/CONFIG_CLANG_VERSION/d' "$DEFCONFIG"
-          sed -i \
-            -e 's/^CONFIG_ARCH_SUNXI=y/# CONFIG_ARCH_SUNXI is not set/' \
-            -e 's/^CONFIG_ARCH_ALLWINNER=y/# CONFIG_ARCH_ALLWINNER is not set/' \
-            -e 's/^CONFIG_OF_ALL_DTBS=y/# CONFIG_OF_ALL_DTBS is not set/' \
-            -e 's/^CONFIG_COMPILE_TEST=y/# CONFIG_COMPILE_TEST is not set/' \
-            "$DEFCONFIG"
-          echo "--- symbols after patch ---"
-          grep -nE "ARCH_SUNXI|ARCH_ALLWINNER|OF_ALL_DTBS|COMPILE_TEST|CLANG_VERSION" "$DEFCONFIG" || true
 
       - name: Build kernel
         run: |
@@ -83,14 +69,13 @@ jobs:
           find out -name "*.ko" -exec cp {} out_modules/ \;
           ls -la out_modules/
 
-      - name: Upload Image + dtb/dtbo
+      - name: Upload Image + dtb
         uses: actions/upload-artifact@v4
         with:
           name: kernel-image
           path: |
             arch/arm64/boot/Image
             out/arch/arm64/boot/dts/**/*.dtb
-            out/arch/arm64/boot/dts/**/*.dtbo
           if-no-files-found: warn
 
       - name: Upload kernel modules (.ko)
@@ -100,9 +85,9 @@ jobs:
           path: out_modules/*.ko
           if-no-files-found: warn
 
-      - name: Upload build config
+      - name: Upload full build log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build-config
+          name: build-log
           path: out/.config
