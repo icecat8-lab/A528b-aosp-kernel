@@ -21,17 +21,3 @@ make -j$(nproc) -C $(pwd) O=$(pwd)/out \
 cp out/arch/arm64/boot/Image $(pwd)/arch/arm64/boot/Image
 mkdir -p out_modules
 find out -name "*.ko" -exec cp {} out_modules/ \;
-    olddefconfig
-
-make -j$(nproc) -C "$(pwd)" O="$(pwd)/out" $KERNEL_MAKE_ENV \
-    ARCH=arm64 \
-    CC=clang \
-    CLANG_TRIPLE=aarch64-linux-gnu- \
-    CROSS_COMPILE=aarch64-linux-gnu- \
-    LLVM=1 \
-    LLVM_IAS=1 \
-    CONFIG_SECTION_MISMATCH_WARN_ONLY=y
-
-cp out/arch/arm64/boot/Image "$(pwd)/arch/arm64/boot/Image"
-mkdir -p out_modules
-find out -name "*.ko" -exec cp {} out_modules/ \;
