@@ -1,9 +1,9 @@
 name: Build Kernel (clang-19 / r530567)
 
 on:
-  workflow_dispatch:      # กดรันเองจากแท็บ Actions ได้
+  workflow_dispatch:
   push:
-    branches: [ main ]     # หรือแก้เป็น branch ที่ใช้จริง
+    branches: [ main ]
 
 jobs:
   build:
@@ -39,7 +39,12 @@ jobs:
       - name: Locate clang binary
         id: find-clang
         run: |
-          CLANG_BIN=$(find toolchain/clang-19 -maxdepth 2 -type d -name "bin" | head -n1)
+          CLANG_BIN=$(find toolchain/clang-19 -maxdepth 2 -type d -name "bin" -path "*r530567*" | head -n1)
+          if [ -z "$CLANG_BIN" ]; then
+            echo "::error::clang-r530567 directory not found in toolchain/clang-19"
+            find toolchain/clang-19 -maxdepth 1 -type d
+            exit 1
+          fi
           echo "Found: $CLANG_BIN"
           echo "clang_dir=$(dirname $CLANG_BIN)" >> "$GITHUB_OUTPUT"
 
