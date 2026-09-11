@@ -1,4 +1,4 @@
-name: Build Kernel (clang-r530567)
+name: Build Kernel (clang-19)
 
 on:
   workflow_dispatch:
@@ -26,23 +26,28 @@ jobs:
         id: cache-clang
         uses: actions/cache@v4
         with:
-          path: toolchain/clang-r530567
+          path: toolchain/android-clang
           key: clang-r530567-linux-x86
 
       - name: Download clang r530567 toolchain
         if: steps.cache-clang.outputs.cache-hit != 'true'
         run: |
-          mkdir -p toolchain/clang-r530567
-          wget https://googlesource.com
-          tar -C toolchain/clang-r530567 -xf clang-r530567.tar.gz
-          rm clang-r530567.tar.gz
+          mkdir -p toolchain
+          git clone https://googlesource.com \
+            -b main --depth 1 toolchain/android-clang
 
-
-      - name: Set permissions and verify clang version
+      - name: Locate and verify clang compiler
+        id: find-clang
         run: |
-          # บังคับสิทธิ์ให้ไฟล์ใน bin สามารถ Run ได้ (ป้องกันปัญหา Permission Denied บน GitHub Actions)
-          chmod +x toolchain/clang-r530567/bin/*
-          toolchain/clang-r530567/bin/clang --version
+          CLANG_BIN=$(find toolchain/android-clang -maxdepth 4 -type f -path "*/bin/clang" | head -n1)
+          if [ -z "$CLANG_BIN" ]; then
+            echo "::error::Clang binary not found in toolchain directory!"
+            exit 1
+          fi
+          CLANG_DIR=$(dirname "$(dirname "$CLANG_BIN")")
+          chmod +x $CLANG_DIR/bin/*
+          $CLANG_DIR/bin/clang --version
+          echo "clang_dir=$CLANG_DIR" >> "$GITHUB_OUTPUT"
 
       - name: Restore script permissions
         run: |
@@ -53,9 +58,7 @@ jobs:
       - name: Patch defconfig (cleanup)
         run: |
           DEFCONFIG=arch/arm64/configs/vendor/a52sxq_eur_open_defconfig
-          # ลบ CONFIG_CLANG_VERSION ออกเพื่อให้ระบบคำนวณใหม่ตาม Clang ตัวที่ใช้จริง
           sed -i '/CONFIG_CLANG_VERSION/d' "$DEFCONFIG"
-          # ปิดการทำงานแพลตฟอร์มอื่นที่ไม่เกี่ยวข้องออกเพื่อความรวดเร็ว
           sed -i \
             -e 's/^CONFIG_ARCH_SUNXI=y/# CONFIG_ARCH_SUNXI is not set/' \
             -e 's/^CONFIG_ARCH_ALLWINNER=y/# CONFIG_ARCH_ALLWINNER is not set/' \
@@ -67,8 +70,7 @@ jobs:
 
       - name: Build kernel
         run: |
-          # ส่ง PATH ของคอมไพเลอร์ที่โหลดมาเข้าไปในตัวแปรระบบหลักก่อนรันสคริปต์
-          export PATH=$GITHUB_WORKSPACE/toolchain/clang-r530567/bin:$PATH
+          export PATH=${{ steps.find-clang.outputs.clang_dir }}/bin:$PATH
           ./build_kernel.sh
 
       - name: Collect built modules
