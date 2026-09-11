@@ -1,4 +1,4 @@
-name: Build Kernel (clang-19 / r530567)
+name: Build Kernel (clang-19)
 
 on:
   workflow_dispatch:
