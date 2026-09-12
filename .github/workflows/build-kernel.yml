@@ -55,8 +55,7 @@ jobs:
       - name: Restore script permissions
         run: |
           chmod +x build_kernel.sh
-          find scripts -type f \( -name "*.py" -o -name "*.sh" -o -name "*.pl" \) -exec chmod +x {} \;
-          find tools -type f -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+          find . -type f \( -name "*.py" -o -name "*.sh" -o -name "*.pl" \) -exec chmod +x {} \; 2>/dev/null
 
       - name: Build kernel
         run: |
