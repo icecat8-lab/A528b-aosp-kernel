@@ -16,6 +16,7 @@ make -C $(pwd) O=$(pwd)/out ARCH=arm64 vendor/a52sxq_eur_open_defconfig
 make -j$(nproc) -C $(pwd) O=$(pwd)/out \
     ARCH=arm64 CC=clang LLVM=1 LLVM_IAS=1 CROSS_COMPILE=aarch64-linux-gnu- \
     DTC_INCLUDE="$(pwd)/scripts/dtc/include-prefixes $(pwd)/include" \
+    KCFLAGS="-Wno-error=strict-prototypes" \
     CONFIG_SECTION_MISMATCH_WARN_ONLY=y
 
 cp out/arch/arm64/boot/Image $(pwd)/arch/arm64/boot/Image
